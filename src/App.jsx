@@ -8,6 +8,11 @@ export default function App() {
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  // Password reset (inside dashboard)
+  const [resetCurrentPassword, setResetCurrentPassword] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+
   // Password setup/reset state
   const [authMode, setAuthMode] = useState("login"); // 'login' | 'setup' | 'forgot'
   const [setupOtp, setSetupOtp] = useState("");
@@ -41,31 +46,34 @@ export default function App() {
   // Employee form states
   const [empName, setEmpName] = useState("");
   const [empEmail, setEmpEmail] = useState("");
-  const [empGender, setEmpGender] = useState("Male");
-  const [empEmployeeId, setEmpEmployeeId] = useState("");
   const [empPhone, setEmpPhone] = useState("");
   const [empDoj, setEmpDoj] = useState("");
   const [empAddress, setEmpAddress] = useState("");
-  const [empPan, setEmpPan] = useState("");
   const [empAadhaar, setEmpAadhaar] = useState("");
-  const [empDob, setEmpDob] = useState("");
   const [empDesignation, setEmpDesignation] = useState("");
-  const [empBranch, setEmpBranch] = useState("");
-  const [empNameAsPerRecords, setEmpNameAsPerRecords] = useState("");
-  const [empFatherName, setEmpFatherName] = useState("");
-  const [empFixedGrossSalary, setEmpFixedGrossSalary] = useState(0);
-  const [empBasicSalary, setEmpBasicSalary] = useState(0);
-  const [empHra, setEmpHra] = useState(0);
-  const [empConveyanceAllowance, setEmpConveyanceAllowance] = useState(0);
-  const [empMedicalAllowance, setEmpMedicalAllowance] = useState(0);
-  const [empDaysPayable, setEmpDaysPayable] = useState(30);
-  const [empPfEsiEl, setEmpPfEsiEl] = useState("");
-  const [empBankName, setEmpBankName] = useState("");
-  const [empAccountNumber, setEmpAccountNumber] = useState("");
-  const [empIfscCode, setEmpIfscCode] = useState("");
-  const [empBankBranchName, setEmpBankBranchName] = useState("");
+  const [empReportingManager, setEmpReportingManager] = useState("");
+  const [empPassword, setEmpPassword] = useState("");
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+
+  // Employee credential management states
+  const [credentialEmployee, setCredentialEmployee] = useState(null);
+  const [credentialPassword, setCredentialPassword] = useState("");
+  const [showCredentialModal, setShowCredentialModal] = useState(false);
+  const [resetPasswordEmployee, setResetPasswordEmployee] = useState(null);
+  const [resetEmpNewPassword, setResetEmpNewPassword] = useState("");
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // Employee Records tab states
+  const [selectedRecordEmployee, setSelectedRecordEmployee] = useState(null);
+  const [recordFormData, setRecordFormData] = useState({
+    gender: "Male", employee_id: "", address: "", pan: "", aadhaar: "",
+    dob: "", branch: "", name_as_per_records: "", father_name: "",
+    fixed_gross_salary: 0, basic_salary: 0, hra: 0, conveyance_allowance: 0,
+    medical_allowance: 0, days_payable: 30, pf_esi_el: "",
+    bank_name: "", account_number: "", ifsc_code: "", bank_branch_name: ""
+  });
+  const [showRecordForm, setShowRecordForm] = useState(false);
 
   // Feedback states
   const [loading, setLoading] = useState(false);
@@ -76,6 +84,15 @@ export default function App() {
   const [ratingSearchQuery, setRatingSearchQuery] = useState("");
   const [ratingColorFilter, setRatingColorFilter] = useState("All");
   const [ratingMonthFilter, setRatingMonthFilter] = useState("");
+
+  // Selection Tracker states
+  const [selectionMonth, setSelectionMonth] = useState(() => {
+    const d = new Date();
+    return d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  });
+  const [selectionSummary, setSelectionSummary] = useState([]);
+  const [selectionDetails, setSelectionDetails] = useState([]);
+  const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState(null);
 
   const BACKEND_URL = "http://localhost:5000";
 
@@ -125,7 +142,7 @@ export default function App() {
   // Fetch data depending on active tab when token is present
   useEffect(() => {
     if (token) {
-      if (activeTab === "employees" || activeTab === "salary_sheets") {
+      if (activeTab === "employees" || activeTab === "salary_sheets" || activeTab === "employee_records") {
         fetchEmployees();
       } else if (activeTab === "attendance") {
         fetchAttendance();
@@ -141,6 +158,8 @@ export default function App() {
       } else if (activeTab === "daily_ratings") {
         fetchAdminDailyRatings();
         fetchAdminDailyRatingsSummary();
+      } else if (activeTab === "selection_tracker") {
+        fetchSelectionSummary();
       } else if (activeTab === "settings") {
         fetchAdminProfile();
       }
@@ -438,6 +457,81 @@ export default function App() {
     }
   };
 
+  const fetchSelectionSummary = async (month = selectionMonth) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/selection-entries/summary?month=${encodeURIComponent(month)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSelectionSummary(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSelectionDetails = async (employeeId, month = selectionMonth) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/selection-entries?employee_id=${employeeId}&month=${encodeURIComponent(month)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSelectionDetails(data);
+      setSelectedEmployeeForDetails(employeeId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadSelectionTracker = (employeeId = null) => {
+    try {
+      const dataToExport = employeeId ? selectionDetails : selectionSummary;
+      if (!dataToExport || dataToExport.length === 0) {
+        setError("No data to export.");
+        return;
+      }
+
+      let rows = [];
+      if (employeeId) {
+        rows = dataToExport.map((rec, index) => ({
+          "Sl No": index + 1,
+          "Date Added": new Date(rec.created_at).toLocaleDateString("en-IN"),
+          "Candidate Name": rec.candidate_name,
+          "Mobile Number": rec.mobile_number,
+          "Email": rec.email || "",
+          "Client Name": rec.client_name,
+          "Designation": rec.designation || "",
+          "Location": rec.location || "",
+          "Selected": rec.selected
+        }));
+      } else {
+        rows = dataToExport.map((rec, index) => ({
+          "Sl No": index + 1,
+          "Employee Name": rec.employee_name,
+          "Month": rec.month,
+          "Selections (Yes)": rec.yes_count,
+          "Score (%)": rec.score,
+          "Status": rec.status
+        }));
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, employeeId ? "Employee Selection Details" : "Selection Summary");
+      XLSX.writeFile(workbook, `Selection_Tracker_${selectionMonth}.xlsx`);
+      setSuccess("Selection Tracker downloaded successfully!");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleDownloadSalaryExcel = () => {
     try {
       if (employees.length === 0) {
@@ -605,29 +699,13 @@ export default function App() {
   const resetEmployeeForm = () => {
     setEmpName("");
     setEmpEmail("");
-    setEmpGender("Male");
-    setEmpEmployeeId("");
     setEmpPhone("");
     setEmpDoj("");
     setEmpAddress("");
-    setEmpPan("");
     setEmpAadhaar("");
-    setEmpDob("");
     setEmpDesignation("");
-    setEmpBranch("");
-    setEmpNameAsPerRecords("");
-    setEmpFatherName("");
-    setEmpFixedGrossSalary(0);
-    setEmpBasicSalary(0);
-    setEmpHra(0);
-    setEmpConveyanceAllowance(0);
-    setEmpMedicalAllowance(0);
-    setEmpDaysPayable(30);
-    setEmpPfEsiEl("");
-    setEmpBankName("");
-    setEmpAccountNumber("");
-    setEmpIfscCode("");
-    setEmpBankBranchName("");
+    setEmpReportingManager("");
+    setEmpPassword("");
     setEditingEmployee(null);
     setShowEmployeeForm(false);
   };
@@ -636,29 +714,13 @@ export default function App() {
     setEditingEmployee(emp);
     setEmpName(emp.name || "");
     setEmpEmail(emp.email || "");
-    setEmpGender(emp.gender || "Male");
-    setEmpEmployeeId(emp.employee_id || "");
     setEmpPhone(emp.phone || "");
     setEmpDoj(emp.doj ? emp.doj.substring(0, 10) : "");
     setEmpAddress(emp.address || "");
-    setEmpPan(emp.pan || "");
     setEmpAadhaar(emp.aadhaar || "");
-    setEmpDob(emp.dob ? emp.dob.substring(0, 10) : "");
     setEmpDesignation(emp.designation || "");
-    setEmpBranch(emp.branch || "");
-    setEmpNameAsPerRecords(emp.name_as_per_records || "");
-    setEmpFatherName(emp.father_name || "");
-    setEmpFixedGrossSalary(Number(emp.fixed_gross_salary) || 0);
-    setEmpBasicSalary(Number(emp.basic_salary) || 0);
-    setEmpHra(Number(emp.hra) || 0);
-    setEmpConveyanceAllowance(Number(emp.conveyance_allowance) || 0);
-    setEmpMedicalAllowance(Number(emp.medical_allowance) || 0);
-    setEmpDaysPayable(Number(emp.days_payable) || 30);
-    setEmpPfEsiEl(emp.pf_esi_el || "");
-    setEmpBankName(emp.bank_name || "");
-    setEmpAccountNumber(emp.account_number || "");
-    setEmpIfscCode(emp.ifsc_code || "");
-    setEmpBankBranchName(emp.bank_branch_name || "");
+    setEmpReportingManager(emp.reporting_manager || "");
+    setEmpPassword("");
     setShowEmployeeForm(true);
   };
 
@@ -671,31 +733,14 @@ export default function App() {
     const payload = {
       name: empName,
       email: empEmail,
-      gender: empGender,
-      employee_id: empEmployeeId,
       phone: empPhone,
       doj: empDoj || null,
       address: empAddress,
-      pan: empPan,
       aadhaar: empAadhaar,
-      dob: empDob || null,
       designation: empDesignation,
-      branch: empBranch,
-      name_as_per_records: empNameAsPerRecords,
-      father_name: empFatherName,
-      fixed_gross_salary: empFixedGrossSalary || 0,
-      basic_salary: empBasicSalary || 0,
-      hra: empHra || 0,
-      conveyance_allowance: empConveyanceAllowance || 0,
-      medical_allowance: empMedicalAllowance || 0,
-      days_payable: empDaysPayable || 0,
-      pf_esi_el: empPfEsiEl,
-      bank_name: empBankName,
-      account_number: empAccountNumber,
-      ifsc_code: empIfscCode,
-      bank_branch_name: empBankBranchName
+      reporting_manager: empReportingManager,
+      password: empPassword || undefined,
     };
-
 
     try {
       let res;
@@ -718,6 +763,115 @@ export default function App() {
 
       setSuccess(editingEmployee ? "Employee updated successfully!" : "Employee registered successfully!");
       resetEmployeeForm();
+      fetchEmployees();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Credential Management Handlers
+  const handleSetCredentials = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/employees/create-credentials`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: credentialEmployee.id, password: credentialPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccess(data.message);
+      setShowCredentialModal(false);
+      setCredentialPassword("");
+      setCredentialEmployee(null);
+      fetchEmployees();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetEmployeePassword = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/employees/reset-password`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: resetPasswordEmployee.id, new_password: resetEmpNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccess(data.message);
+      setShowResetModal(false);
+      setResetEmpNewPassword("");
+      setResetPasswordEmployee(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Employee Records Handlers
+  const openRecordEdit = (emp) => {
+    setSelectedRecordEmployee(emp);
+    setRecordFormData({
+      gender: emp.gender || "Male",
+      employee_id: emp.employee_id || "",
+      address: emp.address || "",
+      pan: emp.pan || "",
+      aadhaar: emp.aadhaar || "",
+      dob: emp.dob ? emp.dob.substring(0, 10) : "",
+      branch: emp.branch || "",
+      name_as_per_records: emp.name_as_per_records || "",
+      father_name: emp.father_name || "",
+      fixed_gross_salary: Number(emp.fixed_gross_salary) || 0,
+      basic_salary: Number(emp.basic_salary) || 0,
+      hra: Number(emp.hra) || 0,
+      conveyance_allowance: Number(emp.conveyance_allowance) || 0,
+      medical_allowance: Number(emp.medical_allowance) || 0,
+      days_payable: Number(emp.days_payable) || 30,
+      pf_esi_el: emp.pf_esi_el || "",
+      bank_name: emp.bank_name || "",
+      account_number: emp.account_number || "",
+      ifsc_code: emp.ifsc_code || "",
+      bank_branch_name: emp.bank_branch_name || ""
+    });
+    setShowRecordForm(true);
+  };
+
+  const handleSaveRecord = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/admin/employees/${selectedRecordEmployee.id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: selectedRecordEmployee.name,
+          email: selectedRecordEmployee.email,
+          ...recordFormData
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setSuccess("Employee record updated successfully!");
+      setShowRecordForm(false);
+      setSelectedRecordEmployee(null);
       fetchEmployees();
     } catch (err) {
       setError(err.message);
@@ -881,11 +1035,11 @@ export default function App() {
             {authMode === "login" && (
               <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <div className="form-group">
-                  <label>Admin Username</label>
+                  <label>Email or Username</label>
                   <input
                     type="text"
                     required
-                    placeholder="admin"
+                    placeholder="eswar@selfeey.com"
                     value={loginUsername}
                     onChange={(e) => setLoginUsername(e.target.value)}
                     className="form-input"
@@ -893,7 +1047,7 @@ export default function App() {
                 </div>
 
                 <div className="form-group">
-                  <label>Admin Password</label>
+                  <label>Password</label>
                   <input
                     type="password"
                     required
@@ -1045,6 +1199,12 @@ export default function App() {
           👥 Employee Management
         </button>
         <button
+          onClick={() => { setError(""); setSuccess(""); setActiveTab("employee_records"); }}
+          className={`tab-btn ${activeTab === "employee_records" ? "active" : ""}`}
+        >
+          🗂️ Employee Records
+        </button>
+        <button
           onClick={() => { setError(""); setSuccess(""); setActiveTab("salary_sheets"); }}
           className={`tab-btn ${activeTab === "salary_sheets" ? "active" : ""}`}
         >
@@ -1087,10 +1247,16 @@ export default function App() {
           📈 Daily Self-Ratings
         </button>
         <button
+          onClick={() => { setError(""); setSuccess(""); setActiveTab("selection_tracker"); }}
+          className={`tab-btn ${activeTab === "selection_tracker" ? "active" : ""}`}
+        >
+          🎯 Selection Tracker
+        </button>
+        <button
           onClick={() => { setError(""); setSuccess(""); setActiveTab("settings"); }}
           className={`tab-btn ${activeTab === "settings" ? "active" : ""}`}
         >
-          ⚙️ Admin Email Settings
+          ⚙️ Settings
         </button>
       </nav>
 
@@ -1109,7 +1275,7 @@ export default function App() {
               <div>
                 <h3>Employee Directory</h3>
                 <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                  Manage employee profiles. Employees registered here can login via Email OTP on the Employee Portal.
+                  Register employees and manage their login credentials. Employees login with Email + Password on the Employee Portal.
                 </p>
               </div>
               <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -1133,17 +1299,17 @@ export default function App() {
                 <span className="lbl">Total Employees</span>
               </div>
               <div className="stat-card">
-                <span className="val">{employees.filter(e => e.gender === "Male").length}</span>
-                <span className="lbl">Male Employees</span>
+                <span className="val">{employees.filter(e => e.password_hash).length}</span>
+                <span className="lbl">Login Active</span>
               </div>
               <div className="stat-card">
-                <span className="val">{employees.filter(e => e.gender === "Female").length}</span>
-                <span className="lbl">Female Employees</span>
+                <span className="val">{employees.filter(e => !e.password_hash).length}</span>
+                <span className="lbl">No Credentials</span>
               </div>
             </div>
           </div>
 
-          {/* Add / Edit Employee Form (Modal-like) */}
+          {/* Add / Edit Employee Form (Simplified 6 fields) */}
           {showEmployeeForm && (
             <div className="panel-card" style={{ borderColor: "rgba(88, 214, 255, 0.3)" }}>
               <div className="panel-header">
@@ -1152,26 +1318,15 @@ export default function App() {
               </div>
               <form onSubmit={handleSaveEmployee} className="employee-form">
                 <div className="form-group">
-                  <label>Full Name *</label>
+                  <label>Employee Name *</label>
                   <input type="text" required placeholder="John Doe" value={empName} onChange={(e) => setEmpName(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
                   <label>Email Address *</label>
-                  <input type="email" required placeholder="john@company.com" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} className="form-input" />
+                  <input type="email" required placeholder="john@milliontalentstech.com" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
-                  <label>Gender *</label>
-                  <select value={empGender} onChange={(e) => setEmpGender(e.target.value)} className="form-input">
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Employee ID</label>
-                  <input type="text" placeholder="EMP-1001" value={empEmployeeId} onChange={(e) => setEmpEmployeeId(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Phone *</label>
+                  <label>Mobile Number *</label>
                   <input type="text" required placeholder="+91 98765 43210" value={empPhone} onChange={(e) => setEmpPhone(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
@@ -1179,90 +1334,74 @@ export default function App() {
                   <input type="date" required value={empDoj} onChange={(e) => setEmpDoj(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group col-span-2">
-                  <label>Address *</label>
+                  <label>Location / Address *</label>
                   <input type="text" required placeholder="Bengaluru, Karnataka" value={empAddress} onChange={(e) => setEmpAddress(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>PAN Number *</label>
-                  <input type="text" required placeholder="ABCDE1234F" value={empPan} onChange={(e) => setEmpPan(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
                   <label>Aadhaar Number *</label>
                   <input type="text" required placeholder="XXXX-XXXX-1234" value={empAadhaar} onChange={(e) => setEmpAadhaar(e.target.value)} className="form-input" />
                 </div>
-                
-                {/* Salary Sheet & Bank Details Section */}
-                <div className="col-span-2" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", marginTop: "1rem", paddingTop: "1rem" }}>
-                  <h4 style={{ color: "var(--accent-pink)", marginBottom: "0.5rem" }}>Salary & Bank Details</h4>
-                </div>
-
                 <div className="form-group">
-                  <label>Designation *</label>
-                  <input type="text" required placeholder="Software Engineer" value={empDesignation} onChange={(e) => setEmpDesignation(e.target.value)} className="form-input" />
+                  <label>Designation</label>
+                  <input type="text" placeholder="Software Engineer" value={empDesignation} onChange={(e) => setEmpDesignation(e.target.value)} className="form-input" />
                 </div>
                 <div className="form-group">
-                  <label>Branch *</label>
-                  <input type="text" required placeholder="Bangalore" value={empBranch} onChange={(e) => setEmpBranch(e.target.value)} className="form-input" />
+                  <label>Reporting Manager</label>
+                  <input type="text" placeholder="Manager Name" value={empReportingManager} onChange={(e) => setEmpReportingManager(e.target.value)} className="form-input" />
                 </div>
-                <div className="form-group">
-                  <label>Name as per Records *</label>
-                  <input type="text" required placeholder="Official Name" value={empNameAsPerRecords} onChange={(e) => setEmpNameAsPerRecords(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Father's Name *</label>
-                  <input type="text" required placeholder="Father's Name" value={empFatherName} onChange={(e) => setEmpFatherName(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Date of Birth *</label>
-                  <input type="date" required value={empDob} onChange={(e) => setEmpDob(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>PF / ESI / EL Details *</label>
-                  <input type="text" required placeholder="PF: 101, ESI: 202" value={empPfEsiEl} onChange={(e) => setEmpPfEsiEl(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Bank Name *</label>
-                  <input type="text" required placeholder="HDFC Bank" value={empBankName} onChange={(e) => setEmpBankName(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Account Number *</label>
-                  <input type="text" required placeholder="1234567890" value={empAccountNumber} onChange={(e) => setEmpAccountNumber(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>IFSC Code *</label>
-                  <input type="text" required placeholder="HDFC0000123" value={empIfscCode} onChange={(e) => setEmpIfscCode(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Bank Branch Name *</label>
-                  <input type="text" required placeholder="Indiranagar" value={empBankBranchName} onChange={(e) => setEmpBankBranchName(e.target.value)} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Fixed Gross Salary *</label>
-                  <input type="number" required placeholder="50000" value={empFixedGrossSalary || ""} onChange={(e) => setEmpFixedGrossSalary(Number(e.target.value))} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Basic Salary *</label>
-                  <input type="number" required placeholder="25000" value={empBasicSalary || ""} onChange={(e) => setEmpBasicSalary(Number(e.target.value))} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>HRA *</label>
-                  <input type="number" required placeholder="10000" value={empHra || ""} onChange={(e) => setEmpHra(Number(e.target.value))} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Conveyance Allowance *</label>
-                  <input type="number" required placeholder="2000" value={empConveyanceAllowance || ""} onChange={(e) => setEmpConveyanceAllowance(Number(e.target.value))} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Medical Allowance *</label>
-                  <input type="number" required placeholder="1250" value={empMedicalAllowance || ""} onChange={(e) => setEmpMedicalAllowance(Number(e.target.value))} className="form-input" />
-                </div>
-                <div className="form-group">
-                  <label>Days Payable *</label>
-                  <input type="number" required placeholder="30" value={empDaysPayable || ""} onChange={(e) => setEmpDaysPayable(Number(e.target.value))} className="form-input" />
-                </div>
+                {!editingEmployee && (
+                  <div className="form-group col-span-2">
+                    <label>Set Login Password (min 6 chars, optional — can be set later)</label>
+                    <input type="password" placeholder="••••••••" minLength={6} value={empPassword} onChange={(e) => setEmpPassword(e.target.value)} className="form-input" />
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading} className="btn-primary col-span-2" style={{ marginTop: "0.5rem" }}>
                   {loading ? "Saving..." : editingEmployee ? "Update Employee" : "Register Employee"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Set Credentials Modal */}
+          {showCredentialModal && credentialEmployee && (
+            <div className="panel-card" style={{ borderColor: "rgba(88, 214, 255, 0.3)", maxWidth: "500px" }}>
+              <div className="panel-header">
+                <h3>🔑 Set Login Password for {credentialEmployee.name}</h3>
+                <button onClick={() => { setShowCredentialModal(false); setCredentialPassword(""); }} className="btn-logout">✕ Close</button>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                Email: <strong>{credentialEmployee.email}</strong> — This will be the employee's login email.
+              </p>
+              <form onSubmit={handleSetCredentials} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div className="form-group">
+                  <label>New Password *</label>
+                  <input type="password" required minLength={6} placeholder="Min. 6 characters" value={credentialPassword} onChange={(e) => setCredentialPassword(e.target.value)} className="form-input" />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary">
+                  {loading ? "Setting..." : "Set Password & Enable Login"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Reset Password Modal */}
+          {showResetModal && resetPasswordEmployee && (
+            <div className="panel-card" style={{ borderColor: "rgba(239, 68, 68, 0.3)", maxWidth: "500px" }}>
+              <div className="panel-header">
+                <h3>🔒 Reset Password for {resetPasswordEmployee.name}</h3>
+                <button onClick={() => { setShowResetModal(false); setResetEmpNewPassword(""); }} className="btn-logout">✕ Close</button>
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "1rem" }}>
+                Email: <strong>{resetPasswordEmployee.email}</strong>
+              </p>
+              <form onSubmit={handleResetEmployeePassword} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div className="form-group">
+                  <label>New Password *</label>
+                  <input type="password" required minLength={6} placeholder="Min. 6 characters" value={resetEmpNewPassword} onChange={(e) => setResetEmpNewPassword(e.target.value)} className="form-input" />
+                </div>
+                <button type="submit" disabled={loading} className="btn-primary">
+                  {loading ? "Resetting..." : "Reset Password"}
                 </button>
               </form>
             </div>
@@ -1275,42 +1414,213 @@ export default function App() {
                 <thead>
                   <tr>
                     <th>Employee</th>
-                    <th>Employee ID</th>
-                    <th>Gender</th>
+                    <th>Designation</th>
                     <th>Phone</th>
                     <th>DOJ</th>
+                    <th>Reporting Manager</th>
+                    <th>Login Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="empty-text">No employees registered yet. Click "Add Employee" to get started.</td>
+                      <td colSpan="7" className="empty-text">No employees registered yet. Click "Add Employee" to get started.</td>
                     </tr>
                   ) : (
                     employees.map((emp) => (
                       <tr key={emp.id}>
                         <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                            <div className={`avatar-icon ${emp.gender === "Female" ? "avatar-female" : "avatar-male"}`}>
-                              {emp.gender === "Female" ? (
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
-                                  <circle cx="12" cy="8" r="4" />
-                                  <path d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7" />
-                                  <path d="M12 2c1.5 2 2.5 3 4 3" />
-                                  <path d="M12 2c-1.5 2-2.5 3-4 3" />
-                                </svg>
-                              ) : (
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
-                                  <circle cx="12" cy="8" r="4" />
-                                  <path d="M5 20c0-3.87 3.13-7 7-7s7 3.13 7 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{emp.name}</div>
-                              <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
-                            </div>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
+                          </div>
+                        </td>
+                        <td>{emp.designation || "—"}</td>
+                        <td>{emp.phone || "—"}</td>
+                        <td>{emp.doj ? new Date(emp.doj).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                        <td>{emp.reporting_manager || "—"}</td>
+                        <td>
+                          {emp.password_hash ? (
+                            <span className="badge badge-approved">✅ Active</span>
+                          ) : (
+                            <span className="badge badge-pending">⚠️ No Password</span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="action-buttons" style={{ flexWrap: "wrap" }}>
+                            <button onClick={() => openEditEmployee(emp)} className="btn-action-approve">Edit</button>
+                            {!emp.password_hash ? (
+                              <button onClick={() => { setCredentialEmployee(emp); setShowCredentialModal(true); setCredentialPassword(""); }} className="btn-action-approve" style={{ backgroundColor: "rgba(139, 92, 246, 0.15)", color: "#a78bfa", borderColor: "rgba(139, 92, 246, 0.3)" }}>
+                                Set Password
+                              </button>
+                            ) : (
+                              <button onClick={() => { setResetPasswordEmployee(emp); setShowResetModal(true); setResetEmpNewPassword(""); }} className="btn-action-approve" style={{ backgroundColor: "rgba(245, 158, 11, 0.15)", color: "#F59E0B", borderColor: "rgba(245, 158, 11, 0.3)" }}>
+                                Reset Password
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteEmployee(emp.id)} className="btn-action-reject">Delete</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB CONTENT: EMPLOYEE RECORDS (Detailed)
+          ========================================== */}
+      {activeTab === "employee_records" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          <div className="panel-card">
+            <div className="panel-header">
+              <div>
+                <h3>Employee Records</h3>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                  View and manage detailed employee records: personal info, salary details, bank details, and more. Employees can also fill these from their own dashboard.
+                </p>
+              </div>
+              <button onClick={fetchEmployees} className="btn-logout" style={{ border: "1px solid var(--accent-pink)", color: "var(--accent-pink)" }}>
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          {/* Edit Record Form */}
+          {showRecordForm && selectedRecordEmployee && (
+            <div className="panel-card" style={{ borderColor: "rgba(88, 214, 255, 0.3)" }}>
+              <div className="panel-header">
+                <h3>Edit Records: {selectedRecordEmployee.name} ({selectedRecordEmployee.email})</h3>
+                <button onClick={() => { setShowRecordForm(false); setSelectedRecordEmployee(null); }} className="btn-logout">✕ Close</button>
+              </div>
+              <form onSubmit={handleSaveRecord} className="employee-form">
+                <div className="form-group">
+                  <label>Gender</label>
+                  <select value={recordFormData.gender} onChange={(e) => setRecordFormData({...recordFormData, gender: e.target.value})} className="form-input">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Employee ID</label>
+                  <input type="text" placeholder="EMP-1001" value={recordFormData.employee_id} onChange={(e) => setRecordFormData({...recordFormData, employee_id: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group col-span-2">
+                  <label>Address</label>
+                  <input type="text" placeholder="Bengaluru, Karnataka" value={recordFormData.address} onChange={(e) => setRecordFormData({...recordFormData, address: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>PAN Number</label>
+                  <input type="text" placeholder="ABCDE1234F" value={recordFormData.pan} onChange={(e) => setRecordFormData({...recordFormData, pan: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Aadhaar Number</label>
+                  <input type="text" placeholder="XXXX-XXXX-1234" value={recordFormData.aadhaar} onChange={(e) => setRecordFormData({...recordFormData, aadhaar: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Date of Birth</label>
+                  <input type="date" value={recordFormData.dob} onChange={(e) => setRecordFormData({...recordFormData, dob: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Branch</label>
+                  <input type="text" placeholder="Bangalore" value={recordFormData.branch} onChange={(e) => setRecordFormData({...recordFormData, branch: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Name as per Records</label>
+                  <input type="text" placeholder="Official Name" value={recordFormData.name_as_per_records} onChange={(e) => setRecordFormData({...recordFormData, name_as_per_records: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Father's Name</label>
+                  <input type="text" placeholder="Father's Name" value={recordFormData.father_name} onChange={(e) => setRecordFormData({...recordFormData, father_name: e.target.value})} className="form-input" />
+                </div>
+
+                <div className="col-span-2" style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", marginTop: "1rem", paddingTop: "1rem" }}>
+                  <h4 style={{ color: "var(--accent-pink)", marginBottom: "0.5rem" }}>Salary & Bank Details</h4>
+                </div>
+                <div className="form-group">
+                  <label>PF / ESI / EL</label>
+                  <input type="text" placeholder="PF: 101, ESI: 202" value={recordFormData.pf_esi_el} onChange={(e) => setRecordFormData({...recordFormData, pf_esi_el: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Bank Name</label>
+                  <input type="text" placeholder="HDFC Bank" value={recordFormData.bank_name} onChange={(e) => setRecordFormData({...recordFormData, bank_name: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Account Number</label>
+                  <input type="text" placeholder="1234567890" value={recordFormData.account_number} onChange={(e) => setRecordFormData({...recordFormData, account_number: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>IFSC Code</label>
+                  <input type="text" placeholder="HDFC0000123" value={recordFormData.ifsc_code} onChange={(e) => setRecordFormData({...recordFormData, ifsc_code: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Bank Branch Name</label>
+                  <input type="text" placeholder="Indiranagar" value={recordFormData.bank_branch_name} onChange={(e) => setRecordFormData({...recordFormData, bank_branch_name: e.target.value})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Fixed Gross Salary</label>
+                  <input type="number" placeholder="50000" value={recordFormData.fixed_gross_salary || ""} onChange={(e) => setRecordFormData({...recordFormData, fixed_gross_salary: Number(e.target.value)})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Basic Salary</label>
+                  <input type="number" placeholder="25000" value={recordFormData.basic_salary || ""} onChange={(e) => setRecordFormData({...recordFormData, basic_salary: Number(e.target.value)})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>HRA</label>
+                  <input type="number" placeholder="10000" value={recordFormData.hra || ""} onChange={(e) => setRecordFormData({...recordFormData, hra: Number(e.target.value)})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Conveyance Allowance</label>
+                  <input type="number" placeholder="2000" value={recordFormData.conveyance_allowance || ""} onChange={(e) => setRecordFormData({...recordFormData, conveyance_allowance: Number(e.target.value)})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Medical Allowance</label>
+                  <input type="number" placeholder="1250" value={recordFormData.medical_allowance || ""} onChange={(e) => setRecordFormData({...recordFormData, medical_allowance: Number(e.target.value)})} className="form-input" />
+                </div>
+                <div className="form-group">
+                  <label>Days Payable</label>
+                  <input type="number" placeholder="30" value={recordFormData.days_payable || ""} onChange={(e) => setRecordFormData({...recordFormData, days_payable: Number(e.target.value)})} className="form-input" />
+                </div>
+
+                <button type="submit" disabled={loading} className="btn-primary col-span-2" style={{ marginTop: "0.5rem" }}>
+                  {loading ? "Saving..." : "Save Record"}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Employee Records Table */}
+          <div className="panel-card">
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Employee ID</th>
+                    <th>Gender</th>
+                    <th>PAN</th>
+                    <th>Bank</th>
+                    <th>Gross Salary</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="empty-text">No employee records found.</td>
+                    </tr>
+                  ) : (
+                    employees.map((emp) => (
+                      <tr key={emp.id}>
+                        <td>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
                           </div>
                         </td>
                         <td style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--accent-pink)" }}>{emp.employee_id || "—"}</td>
@@ -1319,16 +1629,12 @@ export default function App() {
                             {emp.gender || "Male"}
                           </span>
                         </td>
-                        <td>{emp.phone || "—"}</td>
-                        <td>{emp.doj ? new Date(emp.doj).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                        <td style={{ fontFamily: "monospace", fontSize: "0.75rem" }}>{emp.pan || "—"}</td>
+                        <td style={{ fontSize: "0.75rem" }}>{emp.bank_name || "—"}</td>
+                        <td style={{ fontWeight: 600 }}>{Number(emp.fixed_gross_salary) ? `₹${Number(emp.fixed_gross_salary).toLocaleString()}` : "—"}</td>
                         <td>
                           <div className="action-buttons">
-                            <button onClick={() => openEditEmployee(emp)} className="btn-action-approve">
-                              Edit
-                            </button>
-                            <button onClick={() => handleDeleteEmployee(emp.id)} className="btn-action-reject">
-                              Delete
-                            </button>
+                            <button onClick={() => openRecordEdit(emp)} className="btn-action-approve">View / Edit</button>
                           </div>
                         </td>
                       </tr>
@@ -2097,14 +2403,141 @@ export default function App() {
       )}
 
       {/* ==========================================
-          TAB CONTENT: ADMIN EMAIL SETTINGS
+          TAB CONTENT: SELECTION TRACKER
+          ========================================== */}
+      {activeTab === "selection_tracker" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          <div className="panel-card">
+            <div className="panel-header" style={{ marginBottom: "1.5rem" }}>
+              <div className="header-left">
+                <h3>🎯 Selection Tracker</h3>
+                <p>View selection targets and download tracking reports for employees.</p>
+              </div>
+              <div className="header-actions" style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                <select
+                  value={selectionMonth}
+                  onChange={(e) => {
+                    setSelectionMonth(e.target.value);
+                    if (selectedEmployeeForDetails) {
+                      fetchSelectionDetails(selectedEmployeeForDetails, e.target.value);
+                    } else {
+                      fetchSelectionSummary(e.target.value);
+                    }
+                  }}
+                  className="form-input"
+                  style={{ width: "auto" }}
+                >
+                  {[0, 1, 2, 3].map(i => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - i);
+                    const m = d.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    return <option key={m} value={m}>{m}</option>;
+                  })}
+                </select>
+                <button
+                  onClick={() => handleDownloadSelectionTracker(selectedEmployeeForDetails)}
+                  className="btn-primary"
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+                >
+                  📥 Download Excel
+                </button>
+                {selectedEmployeeForDetails && (
+                  <button onClick={() => { setSelectedEmployeeForDetails(null); fetchSelectionSummary(selectionMonth); }} className="btn-secondary">
+                    Back to Summary
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {selectedEmployeeForDetails ? (
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Candidate</th>
+                      <th>Client</th>
+                      <th>Mobile</th>
+                      <th>Selection Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectionDetails.length === 0 ? (
+                      <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)" }}>No selection entries found for this employee this month.</td></tr>
+                    ) : (
+                      selectionDetails.map((rec, i) => (
+                        <tr key={i}>
+                          <td>{new Date(rec.created_at).toLocaleDateString("en-IN")}</td>
+                          <td><strong>{rec.candidate_name}</strong></td>
+                          <td>{rec.client_name}</td>
+                          <td style={{ fontFamily: "monospace" }}>{rec.mobile_number}</td>
+                          <td>
+                            <span className={`status-badge ${rec.selected === "Yes" ? "status-active" : "status-resigned"}`}>
+                              {rec.selected}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Total Selections</th>
+                      <th>Score</th>
+                      <th>Status (Target: 20)</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectionSummary.length === 0 ? (
+                      <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--text-secondary)" }}>No data available for this month.</td></tr>
+                    ) : (
+                      selectionSummary.map((rec, i) => (
+                        <tr key={i}>
+                          <td><strong>{rec.employee_name}</strong></td>
+                          <td>{rec.yes_count}</td>
+                          <td><strong>{rec.score}%</strong></td>
+                          <td>
+                            <span className={`status-badge ${rec.status === "Green" ? "status-active" : "status-resigned"}`}>
+                              {rec.status === "Green" ? "🟢 Green" : "🔴 Red"}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              onClick={() => fetchSelectionDetails(rec.employee_id, selectionMonth)}
+                              className="btn-action btn-view"
+                              title="View Entries"
+                            >
+                              👁️ View Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB CONTENT: SETTINGS (Email + Reset Password)
           ========================================== */}
       {activeTab === "settings" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          {/* Email Settings */}
           <div className="panel-card" style={{ maxWidth: "600px", margin: "0 auto", width: "100%" }}>
             <h3>Admin Notification Settings</h3>
             <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "1.5rem" }}>
-              Configure the email address that will receive administrative OTP codes for first-time password setup, resets, and other credentials.
+              Configure the email address that will receive administrative notifications.
             </p>
             <form onSubmit={handleUpdateAdminEmail} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
               <div className="form-group">
@@ -2118,12 +2551,94 @@ export default function App() {
                   className="form-input"
                 />
                 <span style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
-                  All future Admin OTP emails will be sent strictly to this address.
+                  All future Admin notification emails will be sent to this address.
                 </span>
               </div>
               
               <button type="submit" disabled={loading} className="btn-primary" style={{ alignSelf: "flex-start", padding: "0.75rem 2rem" }}>
                 {loading ? "Saving Settings..." : "Save Settings"}
+              </button>
+            </form>
+          </div>
+
+          {/* Reset Password */}
+          <div className="panel-card" style={{ maxWidth: "600px", margin: "0 auto", width: "100%" }}>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>🔒 Reset Password</h3>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "1.5rem" }}>
+              Change your admin password. Enter your current password and a new password below.
+            </p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setError("");
+              setSuccess("");
+              if (resetNewPassword !== resetConfirmPassword) {
+                setError("New password and confirm password do not match.");
+                return;
+              }
+              if (resetNewPassword.length < 6) {
+                setError("New password must be at least 6 characters.");
+                return;
+              }
+              setLoading(true);
+              try {
+                const res = await fetch(`${BACKEND_URL}/api/admin/reset-password`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    current_password: resetCurrentPassword,
+                    new_password: resetNewPassword,
+                  }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "Password reset failed");
+                setSuccess(data.message || "Password changed successfully!");
+                setResetCurrentPassword("");
+                setResetNewPassword("");
+                setResetConfirmPassword("");
+              } catch (err) {
+                setError(err.message);
+              } finally {
+                setLoading(false);
+              }
+            }} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div className="form-group">
+                <label>Current Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Enter current password"
+                  value={resetCurrentPassword}
+                  onChange={(e) => setResetCurrentPassword(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label>New Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Min. 6 characters"
+                  value={resetNewPassword}
+                  onChange={(e) => setResetNewPassword(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              <div className="form-group">
+                <label>Confirm New Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="Re-enter new password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => setResetConfirmPassword(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              <button type="submit" disabled={loading} className="btn-primary" style={{ alignSelf: "flex-start", padding: "0.75rem 2rem" }}>
+                {loading ? "Changing Password..." : "Change Password"}
               </button>
             </form>
           </div>
