@@ -612,3 +612,25 @@ body::before {
     font-size: 0.75rem;
   }
 }
+
+/* Clickable Name Link */
+.name-link {
+  color: var(--accent-purple);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition: all 0.2s ease;
+}
+
+.name-link:hover {
+  color: #58D6FF;
+  text-decoration-color: #58D6FF;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

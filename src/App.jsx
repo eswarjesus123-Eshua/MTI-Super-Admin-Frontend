@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
+import { Eye, EyeOff } from "lucide-react";
+import DetailsPage from "./DetailsPage";
 
 export default function App() {
   // Auth state
@@ -7,6 +9,7 @@ export default function App() {
   const [token, setToken] = useState("");
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Password reset (inside dashboard)
   const [resetCurrentPassword, setResetCurrentPassword] = useState("");
@@ -24,6 +27,7 @@ export default function App() {
 
   // Tab navigation
   const [activeTab, setActiveTab] = useState("employees"); // 'employees' | 'attendance' | 'jobs' | 'applications' | 'requests' | 'daily_ratings'
+  const [selectedDetails, setSelectedDetails] = useState({ type: null, data: null });
 
   // Data lists
   const [attendanceLogs, setAttendanceLogs] = useState([]);
@@ -94,7 +98,7 @@ export default function App() {
   const [selectionDetails, setSelectionDetails] = useState([]);
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState(null);
 
-  const BACKEND_URL = "http://localhost:5000";
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
   // Load session from localStorage on mount
   useEffect(() => {
@@ -730,7 +734,19 @@ export default function App() {
     setSuccess("");
     setLoading(true);
 
+    if (empPhone.length !== 10) {
+      setError("Mobile Number must be exactly 10 digits.");
+      setLoading(false);
+      return;
+    }
+    if (/^[02345]/.test(empPhone)) {
+      setError("Mobile Number cannot start with 0, 2, 3, 4, or 5.");
+      setLoading(false);
+      return;
+    }
+
     const payload = {
+      ...(editingEmployee || {}),
       name: empName,
       email: empEmail,
       phone: empPhone,
@@ -1048,14 +1064,36 @@ export default function App() {
 
                 <div className="form-group">
                   <label>Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="form-input"
-                  />
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type={showLoginPassword ? "text" : "password"}
+                      required
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="form-input"
+                      style={{ paddingRight: "40px", width: "100%" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      {showLoginPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
                 </div>
 
                 <button type="submit" disabled={loading} className="btn-primary">
@@ -1190,7 +1228,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* Navigation tabs */}
+      {selectedDetails.type ? (
+        <DetailsPage details={selectedDetails} onBack={() => setSelectedDetails({ type: null, data: null })} />
+      ) : (
+        <>
+          {/* Navigation tabs */}
       <nav className="tabs-bar">
         <button
           onClick={() => { setError(""); setSuccess(""); setActiveTab("employees"); }}
@@ -1327,7 +1369,11 @@ export default function App() {
                 </div>
                 <div className="form-group">
                   <label>Mobile Number *</label>
-                  <input type="text" required placeholder="+91 98765 43210" value={empPhone} onChange={(e) => setEmpPhone(e.target.value)} className="form-input" />
+                  <input type="text" required maxLength="10" placeholder="9876543210" value={empPhone} onChange={(e) => {
+                    let val = e.target.value.replace(/\D/g, "");
+                    val = val.replace(/^[0-5]+/, "");
+                    setEmpPhone(val);
+                  }} className="form-input" />
                 </div>
                 <div className="form-group">
                   <label>Date of Joining *</label>
@@ -1339,7 +1385,7 @@ export default function App() {
                 </div>
                 <div className="form-group">
                   <label>Aadhaar Number *</label>
-                  <input type="text" required placeholder="XXXX-XXXX-1234" value={empAadhaar} onChange={(e) => setEmpAadhaar(e.target.value)} className="form-input" />
+                  <input type="text" required maxLength="12" placeholder="123456789012" value={empAadhaar} onChange={(e) => setEmpAadhaar(e.target.value.replace(/\D/g, ""))} className="form-input" />
                 </div>
                 <div className="form-group">
                   <label>Designation</label>
@@ -1432,7 +1478,7 @@ export default function App() {
                       <tr key={emp.id}>
                         <td>
                           <div>
-                            <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                            <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'employee', data: emp })}>{emp.name}</span></div>
                             <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
                           </div>
                         </td>
@@ -1619,7 +1665,7 @@ export default function App() {
                       <tr key={emp.id}>
                         <td>
                           <div>
-                            <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                            <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'employee', data: emp })}>{emp.name}</span></div>
                             <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
                           </div>
                         </td>
@@ -1717,7 +1763,7 @@ export default function App() {
                               {log.employee_gender === "Female" ? "♀" : "♂"}
                             </div>
                             <div>
-                              <div style={{ fontWeight: 600 }}>{log.employee_name}</div>
+                              <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'employee', data: { name: log.employee_name, email: log.employee_email } })}>{log.employee_name}</span></div>
                               <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{log.employee_email}</div>
                             </div>
                           </div>
@@ -1881,7 +1927,7 @@ export default function App() {
                   applications.map((app) => (
                     <tr key={app.id}>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{app.name}</div>
+                        <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'candidate', data: app })}>{app.name}</span></div>
                         <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{app.email} | {app.phone}</div>
                         {app.cover_letter && (
                           <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.5rem", fontStyle: "italic" }}>
@@ -2015,7 +2061,7 @@ export default function App() {
                           <td>{index + 1}</td>
                           <td style={{ fontFamily: "monospace", color: "var(--accent-pink)", fontWeight: 600 }}>{emp.employee_id || "—"}</td>
                           <td>
-                            <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                            <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'employee', data: emp })}>{emp.name}</span></div>
                             <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{emp.email}</div>
                           </td>
                           <td>{emp.branch || "—"}</td>
@@ -2080,7 +2126,7 @@ export default function App() {
                       <tr key={rec.id}>
                         <td>{index + 1}</td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{rec.candidate_name}</div>
+                          <div style={{ fontWeight: 600 }}><span className="name-link" onClick={() => setSelectedDetails({ type: 'candidate', data: rec })}>{rec.candidate_name}</span></div>
                           <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{rec.applied_designation || "General"}</div>
                         </td>
                         <td style={{ fontFamily: "monospace" }}>{rec.mobile_number}</td>
@@ -2374,7 +2420,7 @@ export default function App() {
                                         gap: "0.25rem"
                                       }}>
                                         <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255, 255, 255, 0.05)", paddingBottom: "0.25rem", fontWeight: 700 }}>
-                                          <span style={{ color: "#fff" }}>{joining.candidate_name}</span>
+                                          <span className="name-link" style={{ color: "#fff" }} onClick={() => setSelectedDetails({ type: 'candidate', data: joining })}>{joining.candidate_name}</span>
                                           <span style={{ color: "var(--accent-pink)", fontFamily: "monospace" }}>{joining.mobile_number}</span>
                                         </div>
                                         <div style={{ color: "var(--text-secondary)", marginTop: "0.25rem" }}>Client: <strong style={{ color: "#fff" }}>{joining.client_name}</strong></div>
@@ -2468,7 +2514,7 @@ export default function App() {
                       selectionDetails.map((rec, i) => (
                         <tr key={i}>
                           <td>{new Date(rec.created_at).toLocaleDateString("en-IN")}</td>
-                          <td><strong>{rec.candidate_name}</strong></td>
+                          <td><strong><span className="name-link" onClick={() => setSelectedDetails({ type: 'candidate', data: rec })}>{rec.candidate_name}</span></strong></td>
                           <td>{rec.client_name}</td>
                           <td style={{ fontFamily: "monospace" }}>{rec.mobile_number}</td>
                           <td>
@@ -2642,7 +2688,7 @@ export default function App() {
               </button>
             </form>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
