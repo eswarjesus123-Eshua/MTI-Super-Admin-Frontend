@@ -98,7 +98,7 @@ export default function App() {
   const [selectionDetails, setSelectionDetails] = useState([]);
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState(null);
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://milliontalentstech.com";
 
   // Load session from localStorage on mount
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function App() {
       setAdminEmail(parsedAdmin.email || "");
 
       // Background fetch fresh profile details
-      fetch("http://localhost:5000/api/admin/profile", {
+      fetch("https://milliontalentstech.com/api/admin/profile", {
         headers: { Authorization: `Bearer ${savedToken}` }
       })
       .then(res => res.json())
